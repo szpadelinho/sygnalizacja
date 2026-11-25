@@ -3,4 +3,6 @@ project(sygnalizacja C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(sygnalizacja main.c)
+add_executable(sygnalizacja main.c
+        types.h
+        helpers.h)

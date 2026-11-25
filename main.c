@@ -1,127 +1,200 @@
-#include <stdbool.h>
 #include <stdio.h>
-#define MAX_ENTRIES 4
-#define MAX_TRAFFIC_LIGHTS 4
+#include <stdlib.h>
+#include <time.h>
+#include "types.h"
+#include "helpers.h"
 
-typedef enum {
-    NORTH,
-    EAST,
-    SOUTH,
-    WEST
-} Direction;
+void addToQueue(Queue *queue, Car car) {
+    if (queue->size >= MAX_CARS_IN_QUEUE) {
+        perror("ERROR: Exceeded the size of Queue");
+        return;
+    }
+    if (queue == NULL) {
+        perror("ERROR: Queue is NULL.");
+        exit(EXIT_FAILURE);
+    }
+    queue->cars[queue->size] = car;
+    queue->size++;
+}
 
-typedef enum {
-    MILITARY,
-    SERVICE,
-    MINI_TRUCK,
-    TRUCK,
-    SEDAN,
-    COUPE,
-    HATCHBACK,
-    SUV,
-    VAN,
-    SPORT,
-    HYPER,
-    MICRO,
-    CONVERTIBLE,
-    OFF_ROAD,
-    CROSSOVER,
-    WAGON,
-    MUSCLE,
-    ROADSTER,
-    MINIVAN,
-    MINIBUS,
-    BUS,
-    TARGA
-} CarType;
+void deleteFromQueue(Queue *queue) {
+    for (int i = 1; i < queue->size; i++) {
+        queue->cars[i - 1] = queue->cars[i];
+    }
+    queue->size--;
+}
 
-typedef enum {
-    RED = 3,
-    YELLOW = 1,
-    GREEN = 24
-} Lights;
+Car initCar() {
+    PrivilegeDeterminator determinator = isCarPrivileged();
+    static int ID = 0;
+    Direction random = (Direction)rand() % 4;
+    Car car;
+    car.ID = ID++;
+    car.direction = getCarDirection(random);
+    car.location = random;
+    car.privileged = determinator.isPrivileged;
+    car.type = determinator.carType;
+    return car;
+}
 
-typedef struct {
-    int ID;
-    Direction dir;
-    CarType type;
-    bool privileged;
-    int arrivalStep;
-} Car;
+Queue initQueue(Direction location) {
+    Queue queue;
+    queue.location = location;
+    queue.cars = malloc(sizeof(Car) * MAX_CARS_IN_QUEUE);
+    if (queue.cars == NULL) perror("ERROR: Cannot allocate memory for queue.cars.");
+    queue.size = 0;
+    return queue;
+}
 
-typedef struct {
-    Direction direction;
-    int lanes;
-} Entry;
+Entry* initEntries() {
+    Entry* entries = malloc(sizeof(Entry) * MAX_ENTRIES);
+    if (entries == NULL) return NULL;
+    for (int i = 0; i < MAX_ENTRIES; i++) {
+        Direction location = (Direction)i;
+        entries[i].location = location;
+        entries[i].queue = initQueue(location);
+    }
+    return entries;
+}
 
-typedef struct {
-    Direction location;
-    Car cars[];
-} Queue;
-
-typedef struct {
-    Direction location;
-    Direction direction;
-} TrafficLight;
-
-typedef struct {
-    TrafficLight lights[MAX_TRAFFIC_LIGHTS];
-    Entry entries[MAX_ENTRIES];
-    int currentStep;
-    int maxSteps;
-} Intersection;
-
-int main(void) {
-    int step = 0;
-    while (step <= 60) {
-        if (step == 0) {
-            int current_step = step;
-            step += RED;
-
-            printf("RED (N-S), RED (W-S):  (%d - %d) \n", current_step, step);
+TrafficLight* initTrafficLights() {
+    TrafficLight* lights = malloc(sizeof(TrafficLight) * MAX_TRAFFIC_LIGHTS);
+    if (lights == NULL) return NULL;
+    for (int i = 0; i < MAX_TRAFFIC_LIGHTS; i++) {
+        switch (i) {
+            case NORTH:
+                lights[i].location = NORTH;
+                lights[i].direction = SOUTH;
+                break;
+            case EAST:
+                lights[i].location = EAST;
+                lights[i].direction = WEST;
+                break;
+            case SOUTH:
+                lights[i].location = SOUTH;
+                lights[i].direction = NORTH;
+                break;
+            case WEST:
+                lights[i].location = WEST;
+                lights[i].direction = EAST;
+                break;
+            default:
+                perror("ERROR: Cannot set TrafficLights attributes.");
+                return NULL;
         }
-        if (step == 3) {
-            int current_step = step;
-            step += YELLOW;
+        lights[i].color = RED;
+    }
+    return lights;
+}
 
-            printf("YELLOW (R->G) (N-S), RED (W-S):  (%d - %d) \n", current_step, step);
+Intersection initIntersection() {
+    Intersection intersection;
+    intersection.lights = initTrafficLights();
+    if (intersection.lights == NULL) {
+        perror("ERROR: Cannot initialize lights for object Intersection.");
+        exit(EXIT_FAILURE);
+    }
+    intersection.carsOnIntersection = malloc(sizeof(Car) * MAX_CARS_IN_QUEUE);
+    intersection.entries = initEntries();
+    if (intersection.entries == NULL) {
+        perror("ERROR: Cannot initialize entries for object Intersection.");
+        exit(EXIT_FAILURE);
+    }
+    intersection.currentStep = 0;
+
+    return intersection;
+}
+
+void print(Intersection *intersection) {
+    int step = intersection->currentStep;
+    printf("%s (N-S), %s (W-E) --> STEP %d\n", getColorName(intersection->lights[0].color), getColorName(intersection->lights[1].color), step);
+}
+
+void setTrafficLights(Intersection *intersection, Lights NSColor, Lights WEColor) {
+    for (int i = 0; i < MAX_TRAFFIC_LIGHTS; i++) {
+        if (intersection->lights[i].location == NORTH || intersection->lights[i].location == SOUTH) {
+            intersection->lights[i].color = NSColor;
         }
-        if (step == 4) {
-            int current_step = step;
-            step += GREEN;
-
-            printf("GREEN (N-S), RED (W-S):  (%d - %d) \n", current_step, step);
-        }
-        if (step == 28) {
-            int current_step = step;
-            step += YELLOW + 1;
-
-            printf("YELLOW (N-S), RED (W-S):  (%d - %d) \n", current_step, step);
-        }
-        if (step == 30) {
-            int current_step = step;
-            step += RED;
-
-            printf("RED (N-S), RED (W-S):  (%d - %d) \n", current_step, step);
-        }
-        if (step == 33) {
-            int current_step = step;
-            step += YELLOW;
-
-            printf("RED (N-S), YELLOW (R->G) (W-S):  (%d - %d) \n", current_step, step);
-        }
-        if (step == 34) {
-            int current_step = step;
-            step += GREEN;
-
-            printf("RED (N-S), GREEN (W-S):  (%d - %d) \n", current_step, step);
-        }
-        if (step == 58) {
-            int current_step = step;
-            step += YELLOW + 1;
-
-            printf("RED (N-S), YELLOW (G->R) (W-S):  (%d - %d) \n", current_step, step);
+        else {
+            intersection->lights[i].color = WEColor;
         }
     }
+}
+
+void updateTrafficLights(Intersection *intersection) {
+    int step = intersection->currentStep;
+    TrafficPhase phase = getCurrentTrafficPhase(step);
+    getCurrentTrafficPhase(phase);
+    switch (phase) {
+        case PHASE_ALL_RED:
+            setTrafficLights(intersection, RED, RED);
+            break;
+        case PHASE_NS_YELLOW_WE_RED:
+            setTrafficLights(intersection, YELLOW, RED);
+            break;
+        case PHASE_NS_GREEN_WE_RED:
+            setTrafficLights(intersection, GREEN, RED);
+            break;
+        case PHASE_NS_RED_WE_YELLOW:
+            setTrafficLights(intersection, RED, YELLOW);
+            break;
+        case PHASE_NS_RED_WE_GREEN:
+            setTrafficLights(intersection, RED, GREEN);
+            break;
+        default:
+            perror("ERROR: Invalid traffic phase.");
+            setTrafficLights(intersection, RED, RED);
+            break;
+    }
+}
+
+static void executeStep(Intersection *intersection) {
+    int currentStep = intersection->currentStep;
+
+    if (currentStep < 0 || currentStep >= 60) {
+        perror("ERROR: Current simulation step is out of range.");
+        return;
+    }
+
+    updateTrafficLights(intersection);
+
+    intersection->currentStep++;
+}
+
+Intersection runSimulation(Intersection *intersection) {
+    while (intersection->currentStep < 60) {
+        print(intersection);
+        executeStep(intersection);
+    }
+}
+
+int executeCommand(Intersection *intersection) {
+    char c;
+    scanf(" %c", &c);
+    switch (c) {
+        case 'X': case 'x':
+            return 0;
+        case 'C': case 'c': {
+            Car car = initCar();
+            addToQueue(&intersection->entries[(int)car.direction].queue, car);
+            break;
+        }
+        case 'S': case 's':
+            runSimulation(intersection);
+            break;
+        case 'P': case 'p':
+            print(intersection);
+            break;
+        default:
+            perror("ERROR: Invalid command.");
+            break;
+    }
+    return 1;
+}
+
+int main(void) {
+    srand(time(NULL));
+    Intersection intersection = initIntersection();
+    while (executeCommand(&intersection));
     return 0;
 }
